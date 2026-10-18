@@ -8,8 +8,10 @@ SECONDS=0 # builtin bash timer
 # Allowed codenames
 ALLOWED_CODENAMES=("sweet" "courbet" "tucana" "toco" "phoenix" "davinci")
 
-# Prompt user for device codename
-read -p "Enter device codename: " DEVICE
+# Bypass prompt jika dijalankan di GitHub Actions (mengambil dari env variable DEVICE)
+if [ -z "$DEVICE" ]; then
+    read -p "Enter device codename: " DEVICE
+fi
 
 # Check if the entered codename is in the allowed list
 if [[ ! " ${ALLOWED_CODENAMES[@]} " =~ " ${DEVICE} " ]]; then
@@ -20,9 +22,11 @@ fi
 ZIPNAME="${DEVICE}-$(date '+%Y%m%d-%H%M').zip"
 
 export ARCH=arm64
-export KBUILD_BUILD_USER=aryan
-export KBUILD_BUILD_HOST=celeste
-export PATH="/home/celeste/aryan/linux-x86/clang-r510928/bin/:$PATH"
+export KBUILD_BUILD_USER=runner
+export KBUILD_BUILD_HOST=github@workflows
+
+# Menyesuaikan path clang dengan direktori hasil clone di GitHub Actions
+export PATH="${PWD}/clang/bin:$PATH"
 
 if [[ $1 = "-c" || $1 = "--clean" ]]; then
 	rm -rf out
@@ -30,6 +34,7 @@ if [[ $1 = "-c" || $1 = "--clean" ]]; then
 fi
 
 echo -e "\nStarting compilation for $DEVICE...\n"
+
 make O=out ARCH=arm64 ${DEVICE}_defconfig
 make -j$(nproc) \
     O=out \
@@ -72,10 +77,3 @@ cd ..
 rm -rf AnyKernel3
 echo -e "\nCompleted in $((SECONDS / 60)) minute(s) and $((SECONDS % 60)) second(s) !"
 echo "Zip: $ZIPNAME"
-
-if test -z "$(git rev-parse --show-cdup 2>/dev/null)" &&
-   head=$(git rev-parse --verify HEAD 2>/dev/null); then
-	HASH="$(echo $head | cut -c1-8)"
-fi
-
-telegram -f $ZIPNAME -M "Completed in $((SECONDS / 60)) minute(s) and $((SECONDS % 60)) second(s) ! Latest commit: $HASH"
