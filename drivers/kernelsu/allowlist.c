@@ -95,7 +95,7 @@ static uint8_t allow_list_bitmap[PAGE_SIZE] __read_mostly __aligned(PAGE_SIZE);
 static struct work_struct ksu_save_work;
 static struct work_struct ksu_load_work;
 
-bool persistent_allow_list(void);
+static bool persistent_allow_list(void);
 
 void ksu_show_allow_list(void)
 {
@@ -113,7 +113,6 @@ void ksu_show_allow_list(void)
 static void ksu_grant_root_to_shell()
 {
 	struct app_profile profile = {
-		.version = KSU_APP_PROFILE_VER,
 		.allow_su = true,
 		.current_uid = 2000,
 	};
@@ -153,6 +152,11 @@ static inline bool forbid_system_uid(uid_t uid) {
 static bool profile_valid(struct app_profile *profile)
 {
 	if (!profile) {
+		return false;
+	}
+
+	if (forbid_system_uid(profile->current_uid)) {
+		pr_err("uid lower than 2000 is unsupported: %d\n", profile->current_uid);
 		return false;
 	}
 
@@ -266,7 +270,7 @@ bool __ksu_is_allow_uid(uid_t uid)
 
 	if (unlikely(uid == 0)) {
 		// already root, but only allow our domain.
-		return is_ksu_domain();
+		return ksu_is_ksu_domain();
 	}
 
 	if (forbid_system_uid(uid)) {
@@ -351,7 +355,7 @@ bool ksu_get_allow_list(int *array, int *length, bool allow)
 	return true;
 }
 
-void do_save_allow_list(struct work_struct *work)
+static void do_save_allow_list(struct work_struct *work)
 {
 	u32 magic = FILE_MAGIC;
 	u32 version = FILE_FORMAT_VERSION;
@@ -393,7 +397,7 @@ exit:
 	filp_close(fp, 0);
 }
 
-void do_load_allow_list(struct work_struct *work)
+static void do_load_allow_list(struct work_struct *work)
 {
 	loff_t off = 0;
 	ssize_t ret = 0;
@@ -483,7 +487,7 @@ void ksu_prune_allowlist(bool (*is_uid_valid)(uid_t, char *, void *), void *data
 }
 
 // make sure allow list works cross boot
-bool persistent_allow_list(void)
+static bool persistent_allow_list(void)
 {
 	return ksu_queue_work(&ksu_save_work);
 }
