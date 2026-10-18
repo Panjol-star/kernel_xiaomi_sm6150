@@ -1,0 +1,62 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: 'Pilih Codename Device'
+        required: true
+        default: 'courbet'
+        type: choice
+        options:
+          - sweet
+          - courbet
+          - tucana
+          - toco
+          - phoenix
+          - davinci
+
+jobs:
+  build:
+    name: Build Custom Kernel
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write # Wajib agar GitHub Actions diizinkan membuat Release
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex \
+          g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev \
+          lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev \
+          libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync \
+          schedtool squashfs-tools xsltproc zip zlib1g-dev
+
+      - name: Setup Clang-r522817
+        run: |
+          echo "Cloning Clang r522817..."
+          git clone --depth=1 https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r522817.git clang
+          clang/bin/clang --version
+
+      - name: Compile Kernel
+        env:
+          DEVICE: ${{ github.event.inputs.device }}
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"
+          name: Kernel for ${{ github.event.inputs.device }}
+          tag_name: ${{ github.event.inputs.device }}-${{ github.run_id }}
+          body: |
+            **Kernel Build Completed**
+            - **Device:** ${{ github.event.inputs.device }}
